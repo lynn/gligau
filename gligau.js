@@ -5,6 +5,7 @@ const util = require('util')
 
 const log = (x) => console.log(util.inspect(x, false, null, true))
 const objMap = (obj, f) => Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, f(v)]));
+const capitalize = (s) => s.replace(/^./, m => m.toUpperCase())
 const rD = (x) => ({ nominative: x, accusative: x })
 const rC = (inf, s, past, pp, ing) => ({ I:inf, you:inf, it:s, past, pp, ing })
 
@@ -41,7 +42,10 @@ const gismuToConjugation = {
         "prep1": "of",
         "prep2": "for",
         "prep3": "by standard",
-    }
+    },
+    "lalxu": {
+        "noun1": "lake",
+    },
 }
 
 function sumtiToDeclension(sumti) {
@@ -65,6 +69,12 @@ function sumtiToDeclension(sumti) {
         if (kc[1].type !== 'selbri') throw new Unsupported();
         const cj = selbriToConjugation(kc[1])
         return rD("a " + cj.noun1);
+    } else if (child.type === "name or name description") {
+        const kc = child.children
+        const namepart = c => c.type === "cmevla" ? c.word : selbriToConjugation(c).noun1
+        return rD(kc.slice(1).map(x => capitalize(namepart(x))).join(" "))
+    } else {
+        throw new Unsupported();
     }
 }
 
@@ -94,7 +104,7 @@ function sentence_to_english(sentence) {
                     console.log('d', d)
                 }
             }
-        } else if (d.type === 'FA') {
+        } else if (c.type === 'FA') {
             // already interpreted by numberSumti
         } else {
             console.log('c', c)
