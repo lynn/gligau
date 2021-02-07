@@ -3,31 +3,27 @@ camxes = require('./camxes')
 const { among, numberSumti, simplifyTree, removeSpaces, removeMorphology } = require('./plixau')
 const util = require('util')
 
-log = (x) => console.log(util.inspect(x, false, null, true))
-objMap = (obj, f) => Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, f(v)]));
-regularDeclension = (x) => ({ nominative: x, accusative: x })
-regularVerb = (inf, s, past, pp, ing) => ({ "I":inf, "you":inf, "it":s, "past":past, "pp":pp, "ing":ing })
+const log = (x) => console.log(util.inspect(x, false, null, true))
+const objMap = (obj, f) => Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, f(v)]));
+const rD = (x) => ({ nominative: x, accusative: x })
+const rC = (inf, s, past, pp, ing) => ({ I:inf, you:inf, it:s, past, pp, ing })
 
-sumkahi_to_declension = {
+const sumkahi_to_declension = {
     "mi": {nominative: "I", accusative: "me"},
-    "do": regularDeclension("you"),
+    "do": rD("you"),
 }
 
-
-verbConjugation = {
-    "be": {"I":"am", "you":"are", "it":"is", "past":"was", "pp":"been", "ing":"being"},
-    "talk": regularVerb("talk", "talks", "talked", "talked", "talking"),
-    "go": regularVerb("go", "goes", "went", "gone", "going"),
+const verbConjugation = {
+    "be": { I:"am", you:"are", it:"is", past:"was", pp:"been", ing:"being" },
+    "talk": rC("talk", "talks", "talked", "talked", "talking"),
+    "go": rC("go", "goes", "went", "gone", "going"),
 }
 
-passive = (cjg) => objMap(verbConjugation.be, v => v + ' ' + cjg.pp)
+const passive = (cjg) => objMap(verbConjugation.be, v => v + ' ' + cjg.pp)
 
-gismuToConjugation = {
+const gismuToConjugation = {
     "tavla": {
-        "verb1": "talks",
-        "verb2": "is talked to", // could be defaults based on prep2~4
-        "verb3": "is talked about",
-        "verb4": "is talked in",
+        "verb1": verbConjugation["talk"],
         "noun1": "speaker",
         "noun2": "listener",
         "noun3": "subject",
@@ -61,14 +57,14 @@ function sumtiToDeclension(sumti) {
         const kc = child.children
         if (kc.length !== 1) throw new Unsupported();
         if (kc[0].type !== 'BY') throw new Unsupported();
-        return regularDeclension(kc[0].word[0].toUpperCase())
+        return rD(kc[0].word[0].toUpperCase())
     } else if (child.type === "description") {
         const kc = child.children
         // if (kc.length !== 2) throw new Unsupported();
         if (kc[0].type !== 'LE') throw new Unsupported();
         if (kc[1].type !== 'selbri') throw new Unsupported();
         const cj = selbriToConjugation(kc[1])
-        return regularDeclension("a " + cj.noun1);
+        return rD("a " + cj.noun1);
     }
 }
 
@@ -106,12 +102,16 @@ function sentence_to_english(sentence) {
     }
 
     const selbri_c = selbriToConjugation(selbri)
+    let finiteVerbForm = "it"
     let words = []
     if (sumti_x[1]) {
-        words.push(sumti_x[1].nominative)
+        const nom = sumti_x[1].nominative
+        words.push(nom)
+        if (nom === "I") finiteVerbForm = "I"
+        if (nom === "you") finiteVerbForm = "you"
     }
     if (selbri_c.verb1) {
-        words.push(selbri_c.verb1)
+        words.push(selbri_c.verb1[finiteVerbForm])
     } else if (selbri_c.adjective1) {
         words.push('is')
         words.push(selbri_c.adjective1)
@@ -138,8 +138,9 @@ function text_to_english(text) {
     return sentences.join(' ')
 }
 
-var fs = require('fs');
-var input = fs.readFileSync(0, 'utf-8');
-// input = "ni'o mi tavla lo xamgu .i lo tavla ku xamgu .i xamgu do .i do tavla mi .i tavla mi cy. fo ly."
+const fs = require('fs');
+const input = fs.readFileSync(0, 'utf-8');
 simple = numberSumti(simplifyTree(removeSpaces(removeMorphology(camxes.parse(input)))))
 console.log(text_to_english(simple[0]))
+
+
