@@ -5,9 +5,11 @@ const util = require('util')
 
 const log = (x) => console.log(util.inspect(x, false, null, true))
 const objMap = (obj, f) => Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, f(v)]));
+const objStrMap = (obj, f) => objMap(obj, v => typeof v === 'string' ? f(v) : objStrMap(v, f));
 const capitalize = (s) => s.replace(/^./, m => m.toUpperCase())
 const rD = (x) => ({ nominative: x, accusative: x })
 const rC = (inf, s, past, pp, ing) => ({ I:inf, you:inf, it:s, past, pp, ing })
+const an = (x) => (/^[aeiou]/.test(x) ? 'an' : 'a') + ' ' + x
 
 const sumkahi_to_declension = {
     "mi": {nominative: "I", accusative: "me"},
@@ -15,9 +17,10 @@ const sumkahi_to_declension = {
 }
 
 const verbConjugation = {
-    "be": { I:"am", you:"are", it:"is", past:"was", pp:"been", ing:"being" },
-    "talk": rC("talk", "talks", "talked", "talked", "talking"),
-    "go": rC("go", "goes", "went", "gone", "going"),
+    be: { I:"am", you:"are", it:"is", past:"was", pp:"been", ing:"being" },
+    talk: rC("talk", "talks", "talked", "talked", "talking"),
+    go: rC("go", "goes", "went", "gone", "going"),
+    sleep: rC("sleep", "sleeps", "slept", "slept", "sleeping"),
 }
 
 const passive = (cjg) => objMap(verbConjugation.be, v => v + ' ' + cjg.pp)
@@ -43,14 +46,28 @@ const gismuToConjugation = {
         "prep2": "for",
         "prep3": "by standard",
     },
-    "lalxu": {
-        "noun1": "lake",
+    "lalxu": { noun1: "lake", },
+    "ractu": { noun1: "rabbit" },
+    "prenu": { noun1: "person" },
+    "zdani": { noun1: "house" },
+    "kumfa": { noun1: "room" },
+    "cmalu": { adjective1: "small" },
+    "zvati": { verb1: verbConjugation.be, prep2: "at" },
+    "sipna": { verb1: verbConjugation.sleep },
+    "melbi": {
+        "adjective1": "beautiful",
+        "noun1": "beautiful thing",
+        "noun2": "beauty admirer",
+        "noun3": "beauty aspect",
+        "noun4": "aesthetic standard",
+        "prep2": "to",
+        "prep3": "in",
+        "prep4": "by standard",
     },
 }
 
 function sumtiToDeclension(sumti) {
     if (!among(sumti.type, ['sumti', 'sumti x'])) throw new Error();
-    if (sumti.children.length !== 1) throw new Unsupported();
     const child = sumti.children[0]
     if (child.type === "sumka'i") {
         const kc = child.children
@@ -63,14 +80,14 @@ function sumtiToDeclension(sumti) {
         if (kc[0].type !== 'BY') throw new Unsupported();
         return rD(kc[0].word[0].toUpperCase())
     } else if (child.type === "description") {
-        const kc = child.children
-        // if (kc.length !== 2) throw new Unsupported();
+        const kc = child.children.filter(c => c.type !== "KU")
         if (kc[0].type !== 'LE') throw new Unsupported();
         if (kc[1].type !== 'selbri') throw new Unsupported();
+        console.log(kc.slice(1))
         const cj = selbriToConjugation(kc[1])
-        return rD("a " + cj.noun1);
+        return rD(an(cj.noun1));
     } else if (child.type === "name or name description") {
-        const kc = child.children
+        const kc = child.children.filter(c => c.type !== "KU")
         const namepart = c => c.type === "cmevla" ? c.word : selbriToConjugation(c).noun1
         return rD(kc.slice(1).map(x => capitalize(namepart(x))).join(" "))
     } else {
@@ -78,11 +95,20 @@ function sumtiToDeclension(sumti) {
     }
 }
 
+function tanruUnitToConjugation(tu) {
+    if (tu.type !== 'gismu') throw new Unsupported();
+    return gismuToConjugation[tu.word];
+}
+
 function selbriToConjugation(selbri) {
+    console.log('stc', selbri)
     if (selbri.type !== 'selbri') throw new Error();
-    if (selbri.children.length !== 1) throw new Unsupported();
-    if (selbri.children[0].type !== 'gismu') throw new Unsupported();
-    return gismuToConjugation[selbri.children[0].word]
+    const n = selbri.children.length;
+    const seltau = selbri.children.slice(0, n-1).map(tanruUnitToConjugation).map(cjg => cjg.adjective1 ?? cjg.noun1 ?? cjg.verb1.ing);
+    const tertau = tanruUnitToConjugation(selbri.children[n-1]);
+    const totalCjg = objStrMap(tertau, x => [...seltau, x].join(" "))
+    console.log('total', totalCjg)
+    return totalCjg
 }
 
 function sentence_to_english(sentence) {
